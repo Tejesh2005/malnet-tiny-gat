@@ -1,0 +1,23 @@
+# Controlled follow-up to paper_baseline.yaml. The architecture and optimizer are
+# unchanged; only artificial isolated nodes created by sparse numeric IDs are removed
+# before Local Degree Profile features are calculated.
+seed: 42
+data_root: data/malnet_tiny_ldp_clean
+output_dir: runs/clean_graph_baseline
+feature_profile: ldp
+log_features: true
+remove_isolated_nodes: true
+hidden_channels: 64
+num_layers: 3
+heads: 4
+dropout: 0.30
+pooling: mean_max
+batch_size: 16
+epochs: 100
+learning_rate: 0.001
+weight_decay: 0.0005
+label_smoothing: 0.0
+patience: 20
+num_workers: 0
+device: auto
+

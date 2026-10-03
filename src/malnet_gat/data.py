@@ -10,7 +10,12 @@ from pathlib import Path
 import torch
 from torch_geometric.data import Data
 from torch_geometric.datasets import MalNetTiny
-from torch_geometric.transforms import BaseTransform, LocalDegreeProfile
+from torch_geometric.transforms import (
+    BaseTransform,
+    Compose,
+    LocalDegreeProfile,
+    RemoveIsolatedNodes,
+)
 
 KNOWN_CLASS_NAMES = ["adware", "benign", "downloader", "trojan", "addisplay"]
 
@@ -53,20 +58,30 @@ class StructuralProfile(BaseTransform):
         return data
 
 
-def make_pre_transform(feature_profile: str, log_features: bool = True) -> BaseTransform:
+def make_pre_transform(
+    feature_profile: str,
+    log_features: bool = True,
+    remove_isolated_nodes: bool = False,
+) -> BaseTransform:
+    transforms: list[BaseTransform] = []
+    if remove_isolated_nodes:
+        transforms.append(RemoveIsolatedNodes())
     if feature_profile == "ldp":
-        return StructuralProfile(log_features=log_features)
-    if feature_profile == "constant":
-        return ConstantFeatures()
-    raise ValueError(f"Unsupported feature profile: {feature_profile}")
+        transforms.append(StructuralProfile(log_features=log_features))
+    elif feature_profile == "constant":
+        transforms.append(ConstantFeatures())
+    else:
+        raise ValueError(f"Unsupported feature profile: {feature_profile}")
+    return Compose(transforms) if len(transforms) > 1 else transforms[0]
 
 
 def load_splits(
     root: str | Path,
     feature_profile: str = "ldp",
     log_features: bool = True,
+    remove_isolated_nodes: bool = False,
 ) -> tuple[MalNetTiny, MalNetTiny, MalNetTiny]:
-    transform = make_pre_transform(feature_profile, log_features)
+    transform = make_pre_transform(feature_profile, log_features, remove_isolated_nodes)
     root = str(root)
     train = MalNetTiny(root=root, split="train", pre_transform=transform)
     val = MalNetTiny(root=root, split="val", pre_transform=transform)
@@ -157,9 +172,13 @@ def download_main() -> None:
     parser.add_argument("--root", default="data/malnet_tiny_ldp")
     parser.add_argument("--feature-profile", choices=["ldp", "constant"], default="ldp")
     parser.add_argument("--no-log-features", action="store_true")
+    parser.add_argument("--remove-isolated-nodes", action="store_true")
     args = parser.parse_args()
     train, val, test = load_splits(
-        args.root, args.feature_profile, log_features=not args.no_log_features
+        args.root,
+        args.feature_profile,
+        log_features=not args.no_log_features,
+        remove_isolated_nodes=args.remove_isolated_nodes,
     )
     print(f"Ready: train={len(train)} val={len(val)} test={len(test)}")
     print(f"Node features: {train.num_node_features}; classes: {train.num_classes}")

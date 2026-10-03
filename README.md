@@ -72,6 +72,18 @@ For a quick wiring check:
 Do not tune on the test results. Change settings using validation metrics, select one
 configuration, and evaluate the test split once for the reported comparison.
 
+### Clean-graph controlled follow-up
+
+The first completed run revealed sparse numeric node IDs that make PyG materialize
+artificial zero-degree nodes (up to 14,166 tensor rows despite the documented 5,000-node
+cap). To test that loader artifact without changing the model, use a separate processed
+root and remove isolates before LDP calculation:
+
+```powershell
+.\.venv\Scripts\malnet-download --root data/malnet_tiny_ldp_clean --remove-isolated-nodes
+.\.venv\Scripts\malnet-train --config configs/clean_graph_baseline.yaml
+```
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

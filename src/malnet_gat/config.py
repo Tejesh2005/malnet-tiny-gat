@@ -14,6 +14,7 @@ class ExperimentConfig:
     output_dir: str = "runs/paper_baseline"
     feature_profile: str = "ldp"
     log_features: bool = True
+    remove_isolated_nodes: bool = False
     hidden_channels: int = 64
     num_layers: int = 3
     heads: int = 4

@@ -1,7 +1,7 @@
 import torch
 from torch_geometric.data import Batch, Data
 
-from malnet_gat.data import StructuralProfile
+from malnet_gat.data import StructuralProfile, make_pre_transform
 from malnet_gat.model import MalNetGAT
 
 
@@ -13,6 +13,16 @@ def test_structural_profile_is_finite() -> None:
     transformed = StructuralProfile()(graph)
     assert transformed.x.shape == (4, 5)
     assert torch.isfinite(transformed.x).all()
+
+
+def test_clean_profile_removes_isolated_nodes_before_features() -> None:
+    graph = Data(
+        edge_index=torch.tensor([[0, 1, 2], [1, 2, 0]], dtype=torch.long),
+        num_nodes=10,
+    )
+    transformed = make_pre_transform("ldp", remove_isolated_nodes=True)(graph)
+    assert transformed.num_nodes == 3
+    assert transformed.x.shape == (3, 5)
 
 
 def test_model_returns_graph_logits_and_embeddings() -> None:

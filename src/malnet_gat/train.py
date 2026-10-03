@@ -37,7 +37,10 @@ def run(config: ExperimentConfig) -> Path:
     write_json(output_dir / "config.json", config.to_dict())
 
     train_set, val_set, test_set = load_splits(
-        config.data_root, config.feature_profile, config.log_features
+        config.data_root,
+        config.feature_profile,
+        config.log_features,
+        config.remove_isolated_nodes,
     )
     class_names = infer_class_names(train_set)
     generator = torch.Generator().manual_seed(config.seed)

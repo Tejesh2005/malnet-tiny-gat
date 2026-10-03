@@ -6,6 +6,7 @@ data_root: data/malnet_tiny_ldp
 output_dir: runs/paper_baseline
 feature_profile: ldp
 log_features: true
+remove_isolated_nodes: false
 hidden_channels: 64
 num_layers: 3
 heads: 4

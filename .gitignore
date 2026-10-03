@@ -7,8 +7,10 @@ __pycache__/
 .cache/
 data/
 runs/
+work/
 outputs/**
 !outputs/.gitkeep
 !outputs/PHASE1_REPORT.md
 !outputs/dataset_report.json
+!outputs/RESULT_ANALYSIS.md
 

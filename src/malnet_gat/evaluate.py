@@ -38,7 +38,12 @@ def evaluate(
     seed_everything(config.seed)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    _, _, test_set = load_splits(config.data_root, config.feature_profile, config.log_features)
+    _, _, test_set = load_splits(
+        config.data_root,
+        config.feature_profile,
+        config.log_features,
+        config.remove_isolated_nodes,
+    )
     loader = DataLoader(
         test_set,
         batch_size=config.batch_size,
