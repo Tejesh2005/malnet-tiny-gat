@@ -1,0 +1,22 @@
+# Reproduction target for the 2026 ICSCCC GAT paper (reported test accuracy: 84.60%).
+# Public metadata does not expose the paper's full hyperparameter table. Values marked
+# here are therefore explicit reproduction choices, not claimed author settings.
+seed: 42
+data_root: data/malnet_tiny_ldp
+output_dir: runs/paper_baseline
+feature_profile: ldp
+log_features: true
+hidden_channels: 64
+num_layers: 3
+heads: 4
+dropout: 0.30
+pooling: mean_max
+batch_size: 16
+epochs: 100
+learning_rate: 0.001
+weight_decay: 0.0005
+label_smoothing: 0.0
+patience: 20
+num_workers: 0
+device: auto
+

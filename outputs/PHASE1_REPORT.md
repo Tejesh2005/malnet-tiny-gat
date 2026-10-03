@@ -1,0 +1,95 @@
+# Phase 1 report — MalNet-Tiny GAT baseline
+
+Prepared: 3 October 2026 (Asia/Calcutta)
+
+## Outcome
+
+The project is set up, the official MalNet-Tiny archive and official split manifests
+have been downloaded, and the topology-only GAT training/evaluation path has been run
+end to end on the complete official split. The paper-target configuration is ready for
+a long training run. A one-epoch smoke experiment was completed to validate the system;
+it is not presented as a paper reproduction score.
+
+## Reproduction target
+
+- Paper: *Android Malware Family Classification using Graph Attention Networks on
+  Function Call Graphs*, ICSCCC 2026.
+- DOI: <https://doi.org/10.1109/ICSCCC69031.2026.11600324>
+- Publicly reported accuracy: **84.60%**.
+- Publicly described ingredients: MalNet-Tiny function-call graphs, topology-derived
+  structural node profiles, graph attention, and t-SNE analysis.
+
+The paper's complete methods/hyperparameter table and reference implementation were not
+publicly discoverable during this phase. The checked-in configuration is therefore a
+close, explicit reconstruction rather than a claim of exact hidden settings.
+
+## Dataset inspection
+
+Source: <http://malnet.cc.gatech.edu/graph-data/malnet-graphs-tiny.tar.gz>
+
+| Split | Graphs | Per class | Mean nodes | Median nodes | Mean edges |
+|---|---:|---:|---:|---:|---:|
+| Train | 3,500 | 700 | 1,504.672 | 987 | 2,831.067 |
+| Validation | 500 | 100 | 1,527.334 | 849 | 2,867.490 |
+| Test | 1,000 | 200 | 1,580.284 | 1,036 | 2,957.264 |
+
+The observed label order assigned by the official PyG loader is `adware`, `benign`,
+`downloader`, `trojan`, `addisplay`. All splits are exactly balanced.
+
+The processed release occupies approximately 507 MB. Although the MalNet paper describes
+Tiny graphs as having at most 5,000 nodes, the official PyG loader derives `num_nodes` as
+`max(edge_index) + 1`; sparse numeric node identifiers produce an observed maximum tensor
+size of 14,166. The baseline retains this official-loader behavior for reproducibility.
+The exact split-manifest hashes and full descriptive statistics are in
+`dataset_report.json`.
+
+## Implemented baseline
+
+- Local Degree Profile node features: degree plus neighbor-degree minimum, maximum,
+  mean, and standard deviation.
+- `log1p` compression of the non-negative structural values.
+- Three GAT layers, 64 hidden channels, four attention heads, ELU, layer normalization,
+  0.30 dropout, mean+max graph pooling, and an MLP classifier.
+- Adam (`lr=0.001`, weight decay `0.0005`), cosine schedule, validation-loss checkpoint
+  selection, 100-epoch ceiling, and patience of 20 epochs.
+- Accuracy, balanced accuracy, macro precision/recall/F1, weighted F1, per-class metrics,
+  confusion matrix, per-sample probabilities, graph embeddings, and t-SNE.
+
+No APK bytes, API names, node identities, or hand-authored semantic attributes enter the
+model.
+
+## Verification
+
+- Python 3.13.9
+- PyTorch 2.14.1 CPU build
+- PyTorch Geometric 2.8.0.post1
+- Unit tests: 2 passed
+- Lint: passed
+- Complete official-split smoke run: passed
+- Smoke runtime: 318.761 seconds on CPU
+- Smoke result after one epoch: 37.00% accuracy, 28.94% macro-F1
+
+The low smoke score is expected for a single epoch and must not be compared as a trained
+baseline against the paper's 84.60%. The smoke artifacts exist only to prove that the
+full train/checkpoint/evaluate/export path works.
+
+## Commands
+
+Run the paper-target experiment:
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs\paper_baseline.yaml
+```
+
+Evaluate the selected checkpoint:
+
+```powershell
+.\.venv\Scripts\malnet-evaluate `
+  --checkpoint runs\paper_baseline\best_model.pt `
+  --output-dir outputs\paper_baseline_evaluation
+```
+
+The machine used in this phase has no CUDA device. The measured first epoch plus
+validation/test inference took about 5.3 minutes, so the full run should be scheduled as
+a multi-hour CPU job or moved to a CUDA environment.
+

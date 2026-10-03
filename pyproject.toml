@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "malnet-gat"
+version = "0.1.0"
+description = "Reproducible MalNet-Tiny graph-attention baseline"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "torch>=2.7",
+  "torch-geometric>=2.6",
+  "numpy>=2.0,<3",
+  "scikit-learn>=1.5",
+  "pandas>=2.2",
+  "matplotlib>=3.9",
+  "seaborn>=0.13",
+  "PyYAML>=6.0",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.9"]
+
+[project.scripts]
+malnet-download = "malnet_gat.data:download_main"
+malnet-inspect = "malnet_gat.data:inspect_main"
+malnet-train = "malnet_gat.train:main"
+malnet-evaluate = "malnet_gat.evaluate:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+

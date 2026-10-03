@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.cache/
+data/
+runs/
+outputs/**
+!outputs/.gitkeep
+!outputs/PHASE1_REPORT.md
+!outputs/dataset_report.json
+
