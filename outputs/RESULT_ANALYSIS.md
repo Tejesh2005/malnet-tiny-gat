@@ -128,3 +128,24 @@ result. The 85.0% seed-42 result remains a valid individual run but should not b
 presented as the expected performance. Full per-seed values and reporting guidance are
 in `outputs/MULTISEED_REPORT.md`.
 
+## Literal paper-configuration result
+
+After the complete paper became available, its stated configuration was implemented
+separately: raw five-value LDP, a deterministic stratified 80/10/10 split, three
+128-channel GAT layers, four averaged heads, ReLU, mean pooling, dropout 0.5, a linear
+classifier, batch size 128, Adam at 0.005, and 50 epochs.
+
+This literal interpretation selected epoch 5 at 63.8% validation accuracy and achieved
+63.0% test accuracy with 60.71% macro-F1. Later training accuracy rose to 71.1% while
+validation accuracy fell to 56.0%, so checkpoint selection was not the cause. Downloader
+recall was 100%, matching the paper's easiest class, but benign recall was only 11%; 73
+of 100 benign graphs were predicted as addisplay.
+
+The result does not reproduce the paper's 84.6%. The paper leaves a key GAT dimension
+ambiguous: it states 128 hidden channels, four heads, and a 128-dimensional pooled
+embedding without specifying whether heads are averaged or concatenated. The first run
+used four 128-channel heads averaged to 128. The next validation-controlled test,
+`configs/paper_exact_concat128.yaml`, uses four concatenated 32-channel heads to retain
+distinct head representations while still producing the stated 128-dimensional
+embedding. All other reported settings and the split remain fixed.
+

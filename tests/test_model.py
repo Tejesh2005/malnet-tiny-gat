@@ -122,3 +122,24 @@ def test_exact_paper_configuration_matches_table_three() -> None:
     assert (config.dropout, config.batch_size, config.epochs) == (0.5, 128, 50)
     assert config.learning_rate == 0.005
     assert config.lr_scheduler == "none"
+
+
+def test_concat_paper_interpretation_still_has_128_dimensions() -> None:
+    config = ExperimentConfig.from_yaml(Path("configs/paper_exact_concat128.yaml"))
+    model = MalNetGAT(
+        5,
+        5,
+        hidden_channels=config.hidden_channels,
+        num_layers=config.num_layers,
+        heads=config.heads,
+        concat_heads=config.concat_heads,
+        activation=config.activation,
+        layer_norm=config.layer_norm,
+        dropout=config.dropout,
+        pooling=config.pooling,
+        classifier_hidden=config.classifier_hidden,
+    )
+    graph = Data(x=torch.ones((3, 5)), edge_index=torch.tensor([[0, 1], [1, 2]]), y=0)
+    batch = Batch.from_data_list([graph])
+    _, embedding = model(batch.x, batch.edge_index, batch.batch, return_embedding=True)
+    assert embedding.shape == (1, 128)

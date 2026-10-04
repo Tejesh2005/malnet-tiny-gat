@@ -149,7 +149,18 @@ a 128-dimensional graph embedding.
 .\.venv\Scripts\malnet-train --config configs/paper_exact.yaml
 ```
 
-The three Table V ablations are also encoded and change only the stated component:
+The literal averaged-head interpretation reached only 63.0% test accuracy. Because the
+paper simultaneously specifies four heads, 128 hidden channels, and a 128-dimensional
+embedding without stating `GATConv.concat`, `configs/paper_exact_concat128.yaml` tests
+the other standard interpretation: four concatenated 32-channel heads yielding 128
+total channels. This changes only the resolution of that documented ambiguity.
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs/paper_exact_concat128.yaml
+```
+
+The three Table V ablations are also encoded, but should be run only after resolving
+the head-width ambiguity and freezing the matching baseline:
 
 ```powershell
 .\.venv\Scripts\malnet-train --config configs/paper_exact_one_head.yaml

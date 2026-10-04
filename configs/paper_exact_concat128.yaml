@@ -1,0 +1,30 @@
+# Alternative resolution of an ambiguity in the paper: four concatenated 32-channel
+# heads produce the stated 128-dimensional node/graph representation. All other
+# reported Table III settings and the deterministic paper-style split stay fixed.
+seed: 42
+data_root: data/malnet_tiny_paper_exact
+output_dir: runs/paper_exact_concat128
+feature_profile: ldp
+log_features: false
+remove_isolated_nodes: false
+split_strategy: paper_stratified
+split_seed: 42
+hidden_channels: 32
+num_layers: 3
+heads: 4
+concat_heads: true
+activation: relu
+layer_norm: false
+dropout: 0.50
+pooling: mean
+classifier_hidden: false
+batch_size: 128
+epochs: 50
+learning_rate: 0.005
+weight_decay: 0.0
+label_smoothing: 0.0
+patience: 0
+lr_scheduler: none
+checkpoint_metric: val_accuracy
+num_workers: 0
+device: auto
