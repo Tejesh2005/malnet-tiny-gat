@@ -28,6 +28,7 @@ malnet-download = "malnet_gat.data:download_main"
 malnet-inspect = "malnet_gat.data:inspect_main"
 malnet-train = "malnet_gat.train:main"
 malnet-evaluate = "malnet_gat.evaluate:main"
+malnet-multiseed = "malnet_gat.multiseed:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

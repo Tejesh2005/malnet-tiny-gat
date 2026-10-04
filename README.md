@@ -107,6 +107,23 @@ The completed concatenated-head run selected epoch 76 by validation loss and ach
 above the paper's reported 84.6% accuracy. See `outputs/RESULT_ANALYSIS.md` for the
 controlled-experiment comparison and per-class findings.
 
+### Multi-seed confirmation
+
+Confirm stability across five predetermined seeds with one resumable command. A
+completed seed-42 directory can be reused, so only the other four models are trained:
+
+```powershell
+.\.venv\Scripts\malnet-multiseed `
+  --config configs/directed_concat_baseline.yaml `
+  --seeds 1 7 21 42 84 `
+  --reuse-result 42=runs/directed_concat_baseline `
+  --output-root runs/directed_concat_multiseed
+```
+
+The runner skips complete per-seed directories on restart and writes
+`multiseed_summary.json` plus `multiseed_results.csv`, including sample standard
+deviations for test accuracy and macro-F1.
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.
