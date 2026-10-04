@@ -115,3 +115,16 @@ were unavailable. It demonstrates that the explicit reconstruction—direction-a
 structural profiles, isolate cleanup, three concatenated multi-head GAT layers, and
 mean+max graph pooling—meets the Phase 1 numerical target on the official split.
 
+## Five-seed confirmation
+
+The final configuration was frozen and rerun with seeds 1, 7, 21, 42, and 84. Mean test
+accuracy was **84.18% ± 1.79%**, and mean test macro-F1 was **84.44% ± 1.80%** (sample
+standard deviations). Individual accuracy ranged from 81.3% to 85.7%. The reported
+84.6% paper result lies inside this observed variability, while the mean differs by
+only -0.42 percentage points.
+
+The multi-seed estimate supersedes the seed-42 score as the primary reproduction
+result. The 85.0% seed-42 result remains a valid individual run but should not be
+presented as the expected performance. Full per-seed values and reporting guidance are
+in `outputs/MULTISEED_REPORT.md`.
+

@@ -6,9 +6,10 @@ Prepared: 4 October 2026 (Asia/Calcutta)
 
 The project is set up, the official MalNet-Tiny archive and official split manifests
 have been downloaded, and four controlled topology-only GAT experiments have been run
-end to end on the complete official split. The final configuration achieved **85.0%
-test accuracy** and **85.28% test macro-F1**, exceeding the paper-reported 84.6%
-accuracy by 0.4 percentage points.
+end to end on the complete official split. A five-seed confirmation of the final frozen
+configuration achieved **84.18% ± 1.79% test accuracy** and **84.44% ± 1.80% test
+macro-F1** (mean ± sample standard deviation). The paper's reported 84.6% accuracy is
+within the observed seed-to-seed variation.
 
 ## Reproduction target
 
@@ -68,10 +69,11 @@ model.
 - Kaggle GPU: NVIDIA T4
 - Unit tests: 5 passed
 - Lint: passed
-- Selected checkpoint: epoch 76 by minimum validation loss
-- Validation accuracy / macro-F1: 86.8% / 86.95%
-- Test accuracy / macro-F1: **85.0% / 85.28%**
-- Runtime: 902.267 seconds
+- Seeds: 1, 7, 21, 42, and 84
+- Test accuracy: **84.18% ± 1.79%** (range 81.3%–85.7%)
+- Test macro-F1: **84.44% ± 1.80%**
+- Seed-42 test accuracy / macro-F1: 85.0% / 85.28%
+- Total runtime across five seeds: 4,187.193 seconds (69.79 minutes)
 - Evaluation export: metrics, confusion matrix, predictions, embeddings, and t-SNE
 
 ## Commands

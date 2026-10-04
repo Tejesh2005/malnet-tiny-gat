@@ -13,4 +13,5 @@ outputs/**
 !outputs/PHASE1_REPORT.md
 !outputs/dataset_report.json
 !outputs/RESULT_ANALYSIS.md
+!outputs/MULTISEED_REPORT.md
 

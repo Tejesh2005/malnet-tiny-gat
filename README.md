@@ -124,6 +124,12 @@ The runner skips complete per-seed directories on restart and writes
 `multiseed_summary.json` plus `multiseed_results.csv`, including sample standard
 deviations for test accuracy and macro-F1.
 
+The completed five-seed confirmation (`1, 7, 21, 42, 84`) produced **84.18% ± 1.79%**
+test accuracy and **84.44% ± 1.80%** macro-F1 (mean ± sample standard deviation). The
+paper's 84.6% accuracy lies within this observed run-to-run variation. Individual
+accuracies ranged from 81.3% to 85.7%. See `outputs/MULTISEED_REPORT.md` for the full
+seed table and interpretation.
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.
