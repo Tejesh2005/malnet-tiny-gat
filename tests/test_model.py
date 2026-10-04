@@ -152,3 +152,25 @@ def test_clean_paper_configuration_removes_identifier_gaps() -> None:
     assert config.remove_isolated_nodes is True
     assert config.pooling == "mean"
     assert config.hidden_channels * config.heads == 128
+
+
+def test_paper_dropout_is_only_after_graph_pooling() -> None:
+    config = ExperimentConfig.from_yaml(Path("configs/paper_exact_graph_dropout.yaml"))
+    model = MalNetGAT(
+        5,
+        5,
+        hidden_channels=config.hidden_channels,
+        num_layers=config.num_layers,
+        heads=config.heads,
+        concat_heads=config.concat_heads,
+        activation=config.activation,
+        layer_norm=config.layer_norm,
+        dropout=config.dropout,
+        attention_dropout=config.attention_dropout,
+        dropout_location=config.dropout_location,
+        pooling=config.pooling,
+        classifier_hidden=config.classifier_hidden,
+    )
+    assert all(conv.dropout == 0.0 for conv in model.convs)
+    assert model.node_dropout is False
+    assert model.graph_dropout is True

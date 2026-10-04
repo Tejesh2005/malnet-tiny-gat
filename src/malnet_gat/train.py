@@ -28,6 +28,8 @@ def build_model(config: ExperimentConfig, in_channels: int, num_classes: int) ->
         activation=config.activation,
         layer_norm=config.layer_norm,
         dropout=config.dropout,
+        attention_dropout=config.attention_dropout,
+        dropout_location=config.dropout_location,
         pooling=config.pooling,
         classifier_hidden=config.classifier_hidden,
     )

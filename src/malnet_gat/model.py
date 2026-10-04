@@ -20,6 +20,8 @@ class MalNetGAT(nn.Module):
         activation: str = "elu",
         layer_norm: bool = True,
         dropout: float = 0.3,
+        attention_dropout: float | None = None,
+        dropout_location: str = "node",
         pooling: str = "mean_max",
         classifier_hidden: bool = True,
     ) -> None:
@@ -27,6 +29,8 @@ class MalNetGAT(nn.Module):
         if num_layers < 1:
             raise ValueError("num_layers must be positive")
         self.dropout = dropout
+        self.node_dropout = dropout_location in {"node", "both"}
+        self.graph_dropout = dropout_location in {"graph", "both"}
         self.pooling = pooling
         self.activation = activation
         self.convs = nn.ModuleList()
@@ -41,7 +45,7 @@ class MalNetGAT(nn.Module):
                     hidden_channels,
                     heads=heads,
                     concat=concat_heads,
-                    dropout=dropout,
+                    dropout=dropout if attention_dropout is None else attention_dropout,
                     add_self_loops=True,
                 )
             )
@@ -72,7 +76,8 @@ class MalNetGAT(nn.Module):
             x = conv(x, edge_index)
             x = norm(x)
             x = self._activate(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
+            if self.node_dropout:
+                x = F.dropout(x, p=self.dropout, training=self.training)
         return x
 
     def pool(self, x: Tensor, batch: Tensor) -> Tensor:
@@ -89,6 +94,10 @@ class MalNetGAT(nn.Module):
     ) -> Tensor | tuple[Tensor, Tensor]:
         node_embeddings = self.encode_nodes(x, edge_index)
         graph_embedding = self.pool(node_embeddings, batch)
+        if self.graph_dropout:
+            graph_embedding = F.dropout(
+                graph_embedding, p=self.dropout, training=self.training
+            )
         logits = self.classifier(graph_embedding)
         if return_embedding:
             return logits, graph_embedding

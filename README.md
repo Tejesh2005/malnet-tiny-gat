@@ -183,6 +183,16 @@ the head-width ambiguity and freezing the matching baseline:
 .\.venv\Scripts\malnet-train --config configs/paper_exact_no_dropout.yaml
 ```
 
+The no-dropout ablation reached 83.6%, revealing that the earlier 0.5 dropout had been
+applied too broadly. The paper's enumerated layer order places dropout after global
+pooling. `configs/paper_exact_graph_dropout.yaml` implements that literal ordering:
+attention dropout 0, no per-node layer dropout, and one 0.5 dropout on the pooled
+128-dimensional graph embedding before the linear classifier.
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs/paper_exact_graph_dropout.yaml
+```
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

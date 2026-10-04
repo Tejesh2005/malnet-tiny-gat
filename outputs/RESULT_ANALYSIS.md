@@ -161,3 +161,16 @@ pooling, which is particularly sensitive to these zero-degree rows. The configur
 removes them before calculating the same raw five-value LDP; all stated training settings
 and the 128-dimensional concatenated-head interpretation stay fixed.
 
+The isolate-cleaned diagnostic fell further to 58.4% accuracy and 55.52% macro-F1, so
+identifier gaps are not the missing source of the paper result. The one-head ablation
+reached 67.8%, while constant node features produced 20.0%, closely matching the paper's
+19.32% collapse.
+
+The decisive diagnostic was the paper's no-dropout ablation: it reached 83.6% accuracy
+and 83.85% macro-F1, compared with 63.0% when dropout 0.5 was applied inside attention
+and after every GAT layer. The paper describes its model in the order GAT layers,
+global mean pooling, dropout, then classifier. `configs/paper_exact_graph_dropout.yaml`
+therefore applies dropout once to the pooled graph embedding, with attention and
+per-node dropout disabled. This is the closest literal implementation of the described
+layer order and is the final baseline confirmation run before freezing the reproduction.
+

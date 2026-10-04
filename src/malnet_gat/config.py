@@ -24,6 +24,8 @@ class ExperimentConfig:
     activation: str = "elu"
     layer_norm: bool = True
     dropout: float = 0.3
+    attention_dropout: float | None = None
+    dropout_location: str = "node"
     pooling: str = "mean_max"
     classifier_hidden: bool = True
     batch_size: int = 16
@@ -66,6 +68,10 @@ class ExperimentConfig:
             raise ValueError("num_layers, heads, and hidden_channels must be positive")
         if not 0 <= self.dropout < 1:
             raise ValueError("dropout must be in [0, 1)")
+        if self.attention_dropout is not None and not 0 <= self.attention_dropout < 1:
+            raise ValueError("attention_dropout must be in [0, 1) or null")
+        if self.dropout_location not in {"node", "graph", "both"}:
+            raise ValueError("dropout_location must be 'node', 'graph', or 'both'")
         if self.patience < 0:
             raise ValueError("patience must be non-negative")
 
