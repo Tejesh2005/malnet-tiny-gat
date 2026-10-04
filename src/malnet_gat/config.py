@@ -42,8 +42,8 @@ class ExperimentConfig:
         return config
 
     def validate(self) -> None:
-        if self.feature_profile not in {"ldp", "constant"}:
-            raise ValueError("feature_profile must be 'ldp' or 'constant'")
+        if self.feature_profile not in {"ldp", "directed_ldp", "constant"}:
+            raise ValueError("feature_profile must be 'ldp', 'directed_ldp', or 'constant'")
         if self.pooling not in {"mean", "max", "mean_max"}:
             raise ValueError("pooling must be 'mean', 'max', or 'mean_max'")
         if self.num_layers < 1 or self.heads < 1 or self.hidden_channels < 1:

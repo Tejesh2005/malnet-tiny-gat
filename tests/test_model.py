@@ -1,7 +1,7 @@
 import torch
 from torch_geometric.data import Batch, Data
 
-from malnet_gat.data import StructuralProfile, make_pre_transform
+from malnet_gat.data import DirectedStructuralProfile, StructuralProfile, make_pre_transform
 from malnet_gat.model import MalNetGAT
 
 
@@ -23,6 +23,18 @@ def test_clean_profile_removes_isolated_nodes_before_features() -> None:
     transformed = make_pre_transform("ldp", remove_isolated_nodes=True)(graph)
     assert transformed.num_nodes == 3
     assert transformed.x.shape == (3, 5)
+
+
+def test_directed_profile_separates_in_and_out_degree() -> None:
+    graph = Data(
+        edge_index=torch.tensor([[0, 0, 2], [1, 2, 1]], dtype=torch.long),
+        num_nodes=3,
+    )
+    transformed = DirectedStructuralProfile(log_features=False)(graph)
+    assert transformed.x.shape == (3, 11)
+    assert transformed.x[:, 0].tolist() == [0.0, 2.0, 1.0]
+    assert transformed.x[:, 1].tolist() == [2.0, 0.0, 1.0]
+    assert torch.isfinite(transformed.x).all()
 
 
 def test_model_returns_graph_logits_and_embeddings() -> None:

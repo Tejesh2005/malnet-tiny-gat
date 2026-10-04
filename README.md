@@ -84,6 +84,16 @@ root and remove isolates before LDP calculation:
 .\.venv\Scripts\malnet-train --config configs/clean_graph_baseline.yaml
 ```
 
+The next controlled experiment replaces only the five-value LDP with an 11-value
+direction-aware profile containing in/out/total degree and incoming/outgoing neighbor
+degree statistics:
+
+```powershell
+.\.venv\Scripts\malnet-download --root data/malnet_tiny_directed_clean `
+  --feature-profile directed_ldp --remove-isolated-nodes
+.\.venv\Scripts\malnet-train --config configs/directed_clean_baseline.yaml
+```
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

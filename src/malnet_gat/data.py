@@ -58,6 +58,62 @@ class StructuralProfile(BaseTransform):
         return data
 
 
+class DirectedStructuralProfile(BaseTransform):
+    """Direction-aware topology profile for function-call graphs.
+
+    Features are in-degree, out-degree, total degree, followed by min/max/mean/std
+    total-degree statistics for outgoing and incoming neighbors. The resulting 11
+    values retain caller/callee asymmetry that the five-value LDP does not expose.
+    """
+
+    def __init__(self, log_features: bool = True) -> None:
+        self.log_features = log_features
+
+    @staticmethod
+    def _neighbor_stats(index: torch.Tensor, values: torch.Tensor, size: int) -> torch.Tensor:
+        counts = values.new_zeros(size)
+        counts.scatter_add_(0, index, torch.ones_like(values))
+
+        sums = values.new_zeros(size)
+        sums.scatter_add_(0, index, values)
+        squared_sums = values.new_zeros(size)
+        squared_sums.scatter_add_(0, index, values.square())
+        safe_counts = counts.clamp_min(1)
+        means = sums / safe_counts
+        variances = (squared_sums / safe_counts - means.square()).clamp_min(0)
+
+        minimums = values.new_full((size,), float("inf"))
+        maximums = values.new_full((size,), float("-inf"))
+        minimums.scatter_reduce_(0, index, values, reduce="amin", include_self=True)
+        maximums.scatter_reduce_(0, index, values, reduce="amax", include_self=True)
+        has_neighbors = counts > 0
+        minimums = torch.where(has_neighbors, minimums, torch.zeros_like(minimums))
+        maximums = torch.where(has_neighbors, maximums, torch.zeros_like(maximums))
+        return torch.stack([minimums, maximums, means, variances.sqrt()], dim=-1)
+
+    def forward(self, data: Data) -> Data:
+        source, target = data.edge_index
+        size = data.num_nodes
+        out_degree = torch.bincount(source, minlength=size).float()
+        in_degree = torch.bincount(target, minlength=size).float()
+        total_degree = in_degree + out_degree
+        outgoing_stats = self._neighbor_stats(source, total_degree[target], size)
+        incoming_stats = self._neighbor_stats(target, total_degree[source], size)
+        data.x = torch.cat(
+            [
+                in_degree.unsqueeze(-1),
+                out_degree.unsqueeze(-1),
+                total_degree.unsqueeze(-1),
+                outgoing_stats,
+                incoming_stats,
+            ],
+            dim=-1,
+        )
+        if self.log_features:
+            data.x = torch.log1p(data.x)
+        return data
+
+
 def make_pre_transform(
     feature_profile: str,
     log_features: bool = True,
@@ -68,6 +124,8 @@ def make_pre_transform(
         transforms.append(RemoveIsolatedNodes())
     if feature_profile == "ldp":
         transforms.append(StructuralProfile(log_features=log_features))
+    elif feature_profile == "directed_ldp":
+        transforms.append(DirectedStructuralProfile(log_features=log_features))
     elif feature_profile == "constant":
         transforms.append(ConstantFeatures())
     else:
@@ -170,7 +228,9 @@ def inspect_dataset(root: str | Path, limit: int | None = None) -> dict[str, obj
 def download_main() -> None:
     parser = argparse.ArgumentParser(description="Download and preprocess MalNet-Tiny")
     parser.add_argument("--root", default="data/malnet_tiny_ldp")
-    parser.add_argument("--feature-profile", choices=["ldp", "constant"], default="ldp")
+    parser.add_argument(
+        "--feature-profile", choices=["ldp", "directed_ldp", "constant"], default="ldp"
+    )
     parser.add_argument("--no-log-features", action="store_true")
     parser.add_argument("--remove-isolated-nodes", action="store_true")
     args = parser.parse_args()

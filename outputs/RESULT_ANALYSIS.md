@@ -47,3 +47,21 @@ optimizer, split, seed, checkpoint selection, and evaluation remain unchanged.
 Select the checkpoint on validation loss exactly as before. Evaluate the test split once
 after the run; do not use the existing 74.2% test result to tune this configuration.
 
+## Clean-graph result
+
+The clean-graph run selected epoch 82 and reached 77.4% validation accuracy, 76.63%
+validation macro-F1, 73.6% test accuracy, and 73.02% test macro-F1. This is effectively
+unchanged from the original run at the aggregate level. Runtime fell only from 836.956
+to 813.448 seconds.
+
+The class boundary changed substantially: addisplay recall increased from 41.5% to
+87.5%, while benign recall dropped from 70.0% to 42.5%. This confirms that isolated-node
+handling is not the missing source of the paper's 84.6%, and that the five LDP values do
+not stably separate the overlapping advertising/benign classes.
+
+The next controlled configuration, `configs/directed_clean_baseline.yaml`, keeps the
+clean graph and every training/model setting fixed while replacing LDP with 11 explicit
+direction-aware values: in-degree, out-degree, total degree, and min/max/mean/std total
+degree over outgoing and incoming neighbors. This tests whether caller/callee asymmetry
+supplies the missing structural signal without introducing semantic APK features.
+
