@@ -16,6 +16,7 @@ class MalNetGAT(nn.Module):
         hidden_channels: int = 64,
         num_layers: int = 3,
         heads: int = 4,
+        concat_heads: bool = False,
         dropout: float = 0.3,
         pooling: str = "mean_max",
     ) -> None:
@@ -29,20 +30,21 @@ class MalNetGAT(nn.Module):
 
         current = in_channels
         for _ in range(num_layers):
+            output_channels = hidden_channels * heads if concat_heads else hidden_channels
             self.convs.append(
                 GATConv(
                     current,
                     hidden_channels,
                     heads=heads,
-                    concat=False,
+                    concat=concat_heads,
                     dropout=dropout,
                     add_self_loops=True,
                 )
             )
-            self.norms.append(nn.LayerNorm(hidden_channels))
-            current = hidden_channels
+            self.norms.append(nn.LayerNorm(output_channels))
+            current = output_channels
 
-        pooled_channels = hidden_channels * (2 if pooling == "mean_max" else 1)
+        pooled_channels = current * (2 if pooling == "mean_max" else 1)
         self.classifier = nn.Sequential(
             nn.Linear(pooled_channels, hidden_channels),
             nn.ELU(),

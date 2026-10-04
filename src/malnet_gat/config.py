@@ -18,6 +18,7 @@ class ExperimentConfig:
     hidden_channels: int = 64
     num_layers: int = 3
     heads: int = 4
+    concat_heads: bool = False
     dropout: float = 0.3
     pooling: str = "mean_max"
     batch_size: int = 16

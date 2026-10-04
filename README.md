@@ -94,6 +94,14 @@ degree statistics:
 .\.venv\Scripts\malnet-train --config configs/directed_clean_baseline.yaml
 ```
 
+That direction-aware run achieved **75.5% test accuracy** and **76.36% macro-F1**, the
+best result so far. The next controlled run preserves each attention head by
+concatenating its representation rather than averaging heads at every layer:
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs/directed_concat_baseline.yaml
+```
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

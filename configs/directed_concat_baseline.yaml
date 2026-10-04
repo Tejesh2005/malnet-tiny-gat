@@ -1,0 +1,22 @@
+# Controlled follow-up to directed_clean_baseline.yaml. Only multi-head aggregation
+# changes: each GAT layer preserves the four head outputs instead of averaging them.
+seed: 42
+data_root: data/malnet_tiny_directed_clean
+output_dir: runs/directed_concat_baseline
+feature_profile: directed_ldp
+log_features: true
+remove_isolated_nodes: true
+hidden_channels: 64
+num_layers: 3
+heads: 4
+concat_heads: true
+dropout: 0.30
+pooling: mean_max
+batch_size: 16
+epochs: 100
+learning_rate: 0.001
+weight_decay: 0.0005
+label_smoothing: 0.0
+patience: 20
+num_workers: 0
+device: auto

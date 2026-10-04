@@ -65,3 +65,26 @@ direction-aware values: in-degree, out-degree, total degree, and min/max/mean/st
 degree over outgoing and incoming neighbors. This tests whether caller/callee asymmetry
 supplies the missing structural signal without introducing semantic APK features.
 
+## Direction-aware result
+
+The direction-aware run selected epoch 33 and stopped normally after epoch 53. It
+reached 79.4% validation accuracy, 79.78% validation macro-F1, 75.5% test accuracy,
+and 76.36% test macro-F1 in 446.265 seconds. This is the strongest run so far: relative
+to the original baseline it improves test accuracy by 1.3 points and macro-F1 by 2.26
+points. It remains 9.1 accuracy points below the paper's reported 84.6%.
+
+Downloader remains essentially solved (99.5% recall). The directional signal makes the
+advertising classes more balanced than either five-value LDP run: addisplay recall is
+70.5% and adware recall is 61.5%. The largest residual errors all collapse into benign:
+73 adware, 39 trojan, and 51 addisplay samples. The t-SNE projection shows the same
+pattern: downloader has compact, isolated clusters while benign and the advertising
+types overlap heavily.
+
+The 79.4% validation versus 75.5% test result also cautions against choosing the next
+configuration from test performance. `configs/directed_concat_baseline.yaml` changes
+one architectural factor selected in advance: it uses standard concatenated multi-head
+GAT layers instead of averaging the four heads at every layer. This retains distinct
+attention-head representations for graph pooling while leaving the data, split,
+features, optimizer, stopping rule, and seed unchanged. Select it on validation loss
+and evaluate the test set only once after training.
+

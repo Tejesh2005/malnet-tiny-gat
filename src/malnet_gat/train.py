@@ -24,6 +24,7 @@ def build_model(config: ExperimentConfig, in_channels: int, num_classes: int) ->
         hidden_channels=config.hidden_channels,
         num_layers=config.num_layers,
         heads=config.heads,
+        concat_heads=config.concat_heads,
         dropout=config.dropout,
         pooling=config.pooling,
     )
