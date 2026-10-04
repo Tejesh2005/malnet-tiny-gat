@@ -143,3 +143,12 @@ def test_concat_paper_interpretation_still_has_128_dimensions() -> None:
     batch = Batch.from_data_list([graph])
     _, embedding = model(batch.x, batch.edge_index, batch.batch, return_embedding=True)
     assert embedding.shape == (1, 128)
+
+
+def test_clean_paper_configuration_removes_identifier_gaps() -> None:
+    config = ExperimentConfig.from_yaml(Path("configs/paper_exact_clean.yaml"))
+    assert config.feature_profile == "ldp"
+    assert config.log_features is False
+    assert config.remove_isolated_nodes is True
+    assert config.pooling == "mean"
+    assert config.hidden_channels * config.heads == 128

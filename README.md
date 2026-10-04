@@ -159,6 +159,18 @@ total channels. This changes only the resolution of that documented ambiguity.
 .\.venv\Scripts\malnet-train --config configs/paper_exact_concat128.yaml
 ```
 
+That interpretation reached 63.6%, showing that head layout alone is not the missing
+detail. The next loader-fidelity configuration removes artificial isolated tensor rows
+created by sparse numeric node identifiers before calculating raw LDP. These rows do
+not represent functions and strongly dilute the paper's mean pooling:
+
+```powershell
+.\.venv\Scripts\malnet-download --root data/malnet_tiny_paper_exact_clean `
+  --no-log-features --remove-isolated-nodes `
+  --split-strategy paper_stratified --split-seed 42
+.\.venv\Scripts\malnet-train --config configs/paper_exact_clean.yaml
+```
+
 The three Table V ablations are also encoded, but should be run only after resolving
 the head-width ambiguity and freezing the matching baseline:
 

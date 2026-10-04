@@ -149,3 +149,15 @@ used four 128-channel heads averaged to 128. The next validation-controlled test
 distinct head representations while still producing the stated 128-dimensional
 embedding. All other reported settings and the split remain fixed.
 
+The concatenated 32-channel-head interpretation reached 63.6% test accuracy and 60.07%
+macro-F1, effectively unchanged from the averaged-head run. This rules out head layout
+as the primary explanation.
+
+The next controlled configuration, `configs/paper_exact_clean.yaml`, addresses a loader
+artifact rather than changing the paper's method. PyG derives `num_nodes` from the
+largest sparse numeric identifier, creating artificial isolated tensor rows that do not
+represent functions. The paper defines graph nodes as functions and uses global mean
+pooling, which is particularly sensitive to these zero-degree rows. The configuration
+removes them before calculating the same raw five-value LDP; all stated training settings
+and the 128-dimensional concatenated-head interpretation stay fixed.
+
