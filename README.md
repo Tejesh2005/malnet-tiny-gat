@@ -102,6 +102,11 @@ concatenating its representation rather than averaging heads at every layer:
 .\.venv\Scripts\malnet-train --config configs/directed_concat_baseline.yaml
 ```
 
+The completed concatenated-head run selected epoch 76 by validation loss and achieved
+**85.0% test accuracy** and **85.28% test macro-F1**. This is 0.4 percentage points
+above the paper's reported 84.6% accuracy. See `outputs/RESULT_ANALYSIS.md` for the
+controlled-experiment comparison and per-class findings.
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

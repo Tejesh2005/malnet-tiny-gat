@@ -88,3 +88,30 @@ attention-head representations for graph pooling while leaving the data, split,
 features, optimizer, stopping rule, and seed unchanged. Select it on validation loss
 and evaluate the test set only once after training.
 
+## Concatenated-head result
+
+The concatenated-head run selected epoch 76 by minimum validation loss and stopped
+normally at epoch 96 after 20 stale epochs. At the selected checkpoint it reached 86.8%
+validation accuracy and 86.95% validation macro-F1. Held-out test accuracy was **85.0%**
+and macro-F1 was **85.28%**, exceeding the paper-reported 84.6% accuracy by 0.4 points.
+Runtime was 902.267 seconds on a Kaggle T4.
+
+| Experiment | Test accuracy | Test macro-F1 |
+|---|---:|---:|
+| Five-value LDP | 74.2% | 74.10% |
+| Clean graph + LDP | 73.6% | 73.02% |
+| Clean graph + directed profile | 75.5% | 76.36% |
+| Directed profile + concatenated GAT heads | **85.0%** | **85.28%** |
+
+Per-class recall was 89.0% adware, 88.0% benign, 99.5% downloader, 71.0% trojan,
+and 77.5% addisplay. The remaining dominant ambiguity is malware predicted as benign:
+22 adware, 39 trojan, and 39 addisplay samples. Nevertheless, concatenating heads made
+the advertising classes far more separable than averaging them: adware recall rose
+from 61.5% to 89.0%, while addisplay recall rose from 70.5% to 77.5%.
+
+This result reproduces the reported aggregate accuracy, but it is not evidence of an
+exact implementation match because the full paper hyperparameters and reference code
+were unavailable. It demonstrates that the explicit reconstruction—direction-aware
+structural profiles, isolate cleanup, three concatenated multi-head GAT layers, and
+mean+max graph pooling—meets the Phase 1 numerical target on the official split.
+

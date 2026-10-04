@@ -1,14 +1,14 @@
 # Phase 1 report — MalNet-Tiny GAT baseline
 
-Prepared: 3 October 2026 (Asia/Calcutta)
+Prepared: 4 October 2026 (Asia/Calcutta)
 
 ## Outcome
 
 The project is set up, the official MalNet-Tiny archive and official split manifests
-have been downloaded, and the topology-only GAT training/evaluation path has been run
-end to end on the complete official split. The paper-target configuration is ready for
-a long training run. A one-epoch smoke experiment was completed to validate the system;
-it is not presented as a paper reproduction score.
+have been downloaded, and four controlled topology-only GAT experiments have been run
+end to end on the complete official split. The final configuration achieved **85.0%
+test accuracy** and **85.28% test macro-F1**, exceeding the paper-reported 84.6%
+accuracy by 0.4 percentage points.
 
 ## Reproduction target
 
@@ -43,13 +43,15 @@ size of 14,166. The baseline retains this official-loader behavior for reproduci
 The exact split-manifest hashes and full descriptive statistics are in
 `dataset_report.json`.
 
-## Implemented baseline
+## Implemented reconstruction
 
-- Local Degree Profile node features: degree plus neighbor-degree minimum, maximum,
-  mean, and standard deviation.
+- Direction-aware structural node features: in-degree, out-degree, total degree, and
+  incoming/outgoing neighbor-degree minimum, maximum, mean, and standard deviation.
+- Isolated rows induced by sparse numeric node identifiers are removed before feature
+  calculation.
 - `log1p` compression of the non-negative structural values.
-- Three GAT layers, 64 hidden channels, four attention heads, ELU, layer normalization,
-  0.30 dropout, mean+max graph pooling, and an MLP classifier.
+- Three GAT layers, 64 channels per head, four concatenated attention heads, ELU, layer
+  normalization, 0.30 dropout, mean+max graph pooling, and an MLP classifier.
 - Adam (`lr=0.001`, weight decay `0.0005`), cosine schedule, validation-loss checkpoint
   selection, 100-epoch ceiling, and patience of 20 epochs.
 - Accuracy, balanced accuracy, macro precision/recall/F1, weighted F1, per-class metrics,
@@ -58,38 +60,35 @@ The exact split-manifest hashes and full descriptive statistics are in
 No APK bytes, API names, node identities, or hand-authored semantic attributes enter the
 model.
 
-## Verification
+## Final result and verification
 
 - Python 3.13.9
 - PyTorch 2.14.1 CPU build
 - PyTorch Geometric 2.8.0.post1
-- Unit tests: 2 passed
+- Kaggle GPU: NVIDIA T4
+- Unit tests: 5 passed
 - Lint: passed
-- Complete official-split smoke run: passed
-- Smoke runtime: 318.761 seconds on CPU
-- Smoke result after one epoch: 37.00% accuracy, 28.94% macro-F1
-
-The low smoke score is expected for a single epoch and must not be compared as a trained
-baseline against the paper's 84.60%. The smoke artifacts exist only to prove that the
-full train/checkpoint/evaluate/export path works.
+- Selected checkpoint: epoch 76 by minimum validation loss
+- Validation accuracy / macro-F1: 86.8% / 86.95%
+- Test accuracy / macro-F1: **85.0% / 85.28%**
+- Runtime: 902.267 seconds
+- Evaluation export: metrics, confusion matrix, predictions, embeddings, and t-SNE
 
 ## Commands
 
-Run the paper-target experiment:
+Run the successful reconstruction:
 
 ```powershell
-.\.venv\Scripts\malnet-train --config configs\paper_baseline.yaml
+.\.venv\Scripts\malnet-download --root data\malnet_tiny_directed_clean `
+  --feature-profile directed_ldp --remove-isolated-nodes
+.\.venv\Scripts\malnet-train --config configs\directed_concat_baseline.yaml
 ```
 
 Evaluate the selected checkpoint:
 
 ```powershell
 .\.venv\Scripts\malnet-evaluate `
-  --checkpoint runs\paper_baseline\best_model.pt `
-  --output-dir outputs\paper_baseline_evaluation
+  --checkpoint runs\directed_concat_baseline\best_model.pt `
+  --output-dir outputs\directed_concat_evaluation
 ```
-
-The machine used in this phase has no CUDA device. The measured first epoch plus
-validation/test inference took about 5.3 minutes, so the full run should be scheduled as
-a multi-hour CPU job or moved to a CUDA environment.
 
