@@ -8,6 +8,8 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import ConcatDataset, Dataset, Subset
 from torch_geometric.data import Data
 from torch_geometric.datasets import MalNetTiny
 from torch_geometric.transforms import (
@@ -138,18 +140,62 @@ def load_splits(
     feature_profile: str = "ldp",
     log_features: bool = True,
     remove_isolated_nodes: bool = False,
-) -> tuple[MalNetTiny, MalNetTiny, MalNetTiny]:
+    split_strategy: str = "official",
+    split_seed: int = 42,
+) -> tuple[Dataset, Dataset, Dataset]:
     transform = make_pre_transform(feature_profile, log_features, remove_isolated_nodes)
     root = str(root)
     train = MalNetTiny(root=root, split="train", pre_transform=transform)
     val = MalNetTiny(root=root, split="val", pre_transform=transform)
     test = MalNetTiny(root=root, split="test", pre_transform=transform)
+    if split_strategy == "paper_stratified":
+        combined = ConcatDataset([train, val, test])
+        labels = [int(combined[index].y) for index in range(len(combined))]
+        train_indices, val_indices, test_indices = stratified_split_indices(labels, split_seed)
+        return (
+            Subset(combined, train_indices),
+            Subset(combined, val_indices),
+            Subset(combined, test_indices),
+        )
+    if split_strategy != "official":
+        raise ValueError(f"Unsupported split strategy: {split_strategy}")
     return train, val, test
 
 
-def infer_class_names(dataset: MalNetTiny) -> list[str]:
+def stratified_split_indices(
+    labels: list[int], seed: int
+) -> tuple[list[int], list[int], list[int]]:
+    """Create the paper-stated deterministic 80/10/10 stratified split."""
+    indices = list(range(len(labels)))
+    train_indices, remainder = train_test_split(
+        indices,
+        test_size=0.2,
+        random_state=seed,
+        stratify=labels,
+    )
+    remainder_labels = [labels[index] for index in remainder]
+    val_indices, test_indices = train_test_split(
+        remainder,
+        test_size=0.5,
+        random_state=seed,
+        stratify=remainder_labels,
+    )
+    return list(train_indices), list(val_indices), list(test_indices)
+
+
+def _malnet_base(dataset: Dataset) -> MalNetTiny:
+    if isinstance(dataset, MalNetTiny):
+        return dataset
+    if isinstance(dataset, Subset):
+        return _malnet_base(dataset.dataset)
+    if isinstance(dataset, ConcatDataset):
+        return _malnet_base(dataset.datasets[0])
+    raise TypeError(f"Cannot locate MalNetTiny base for {type(dataset).__name__}")
+
+
+def infer_class_names(dataset: Dataset) -> list[str]:
     """Recover label order from the release split files when available."""
-    raw_split = Path(dataset.raw_dir) / "split_info_tiny" / "type"
+    raw_split = Path(_malnet_base(dataset).raw_dir) / "split_info_tiny" / "type"
     label_by_type: dict[str, int] = {}
     # PyG assigns ids in train -> val -> test file order.
     next_label = 0
@@ -233,15 +279,21 @@ def download_main() -> None:
     )
     parser.add_argument("--no-log-features", action="store_true")
     parser.add_argument("--remove-isolated-nodes", action="store_true")
+    parser.add_argument(
+        "--split-strategy", choices=["official", "paper_stratified"], default="official"
+    )
+    parser.add_argument("--split-seed", type=int, default=42)
     args = parser.parse_args()
     train, val, test = load_splits(
         args.root,
         args.feature_profile,
         log_features=not args.no_log_features,
         remove_isolated_nodes=args.remove_isolated_nodes,
+        split_strategy=args.split_strategy,
+        split_seed=args.split_seed,
     )
     print(f"Ready: train={len(train)} val={len(val)} test={len(test)}")
-    print(f"Node features: {train.num_node_features}; classes: {train.num_classes}")
+    print(f"Node features: {train[0].num_node_features}; classes: {len(infer_class_names(train))}")
 
 
 def inspect_main() -> None:

@@ -130,6 +130,36 @@ paper's 84.6% accuracy lies within this observed run-to-run variation. Individua
 accuracies ranged from 81.3% to 85.7%. See `outputs/MULTISEED_REPORT.md` for the full
 seed table and interpretation.
 
+### Exact paper configuration
+
+After obtaining the complete paper, its Table III settings were encoded separately in
+`configs/paper_exact.yaml`: raw five-value LDP, a deterministic stratified 80/10/10
+split, three 128-channel GAT layers, four averaged heads, ReLU, mean pooling, dropout
+0.5, a single linear classifier, batch size 128, Adam at 0.005, and 50 epochs.
+
+The paper does not disclose its split seed, and its unequal test supports conflict with
+its claim of stratification on five balanced classes. This project therefore uses seed
+42 and produces exactly 4,000/500/500 graphs with 100 examples of every class in both
+validation and test. Averaged heads are used because the paper specifies four heads but
+a 128-dimensional graph embedding.
+
+```powershell
+.\.venv\Scripts\malnet-download --root data/malnet_tiny_paper_exact `
+  --no-log-features --split-strategy paper_stratified --split-seed 42
+.\.venv\Scripts\malnet-train --config configs/paper_exact.yaml
+```
+
+The three Table V ablations are also encoded and change only the stated component:
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs/paper_exact_one_head.yaml
+.\.venv\Scripts\malnet-download --root data/malnet_tiny_paper_constant `
+  --feature-profile constant --no-log-features `
+  --split-strategy paper_stratified --split-seed 42
+.\.venv\Scripts\malnet-train --config configs/paper_exact_constant.yaml
+.\.venv\Scripts\malnet-train --config configs/paper_exact_no_dropout.yaml
+```
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

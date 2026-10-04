@@ -43,6 +43,8 @@ def evaluate(
         config.feature_profile,
         config.log_features,
         config.remove_isolated_nodes,
+        config.split_strategy,
+        config.split_seed,
     )
     loader = DataLoader(
         test_set,

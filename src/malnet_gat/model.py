@@ -17,14 +17,18 @@ class MalNetGAT(nn.Module):
         num_layers: int = 3,
         heads: int = 4,
         concat_heads: bool = False,
+        activation: str = "elu",
+        layer_norm: bool = True,
         dropout: float = 0.3,
         pooling: str = "mean_max",
+        classifier_hidden: bool = True,
     ) -> None:
         super().__init__()
         if num_layers < 1:
             raise ValueError("num_layers must be positive")
         self.dropout = dropout
         self.pooling = pooling
+        self.activation = activation
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
 
@@ -41,22 +45,33 @@ class MalNetGAT(nn.Module):
                     add_self_loops=True,
                 )
             )
-            self.norms.append(nn.LayerNorm(output_channels))
+            self.norms.append(nn.LayerNorm(output_channels) if layer_norm else nn.Identity())
             current = output_channels
 
         pooled_channels = current * (2 if pooling == "mean_max" else 1)
-        self.classifier = nn.Sequential(
-            nn.Linear(pooled_channels, hidden_channels),
-            nn.ELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_channels, num_classes),
-        )
+        if classifier_hidden:
+            nonlinearity: nn.Module = nn.ELU() if activation == "elu" else nn.ReLU()
+            self.classifier = nn.Sequential(
+                nn.Linear(pooled_channels, hidden_channels),
+                nonlinearity,
+                nn.Dropout(dropout),
+                nn.Linear(hidden_channels, num_classes),
+            )
+        else:
+            self.classifier = nn.Linear(pooled_channels, num_classes)
+
+    def _activate(self, x: Tensor) -> Tensor:
+        if self.activation == "elu":
+            return F.elu(x)
+        if self.activation == "relu":
+            return F.relu(x)
+        raise ValueError(f"Unsupported activation: {self.activation}")
 
     def encode_nodes(self, x: Tensor, edge_index: Tensor) -> Tensor:
         for conv, norm in zip(self.convs, self.norms, strict=True):
             x = conv(x, edge_index)
             x = norm(x)
-            x = F.elu(x)
+            x = self._activate(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
         return x
 
