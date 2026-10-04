@@ -193,6 +193,14 @@ attention dropout 0, no per-node layer dropout, and one 0.5 dropout on the poole
 .\.venv\Scripts\malnet-train --config configs/paper_exact_graph_dropout.yaml
 ```
 
+Training writes `last_checkpoint.pt` after every completed epoch. If a Kaggle cell is
+interrupted, rerun the same command with `--resume`; model, optimizer, scheduler,
+shuffle generator, RNG state, history, and elapsed time are restored.
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs/paper_exact_graph_dropout.yaml --resume
+```
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.

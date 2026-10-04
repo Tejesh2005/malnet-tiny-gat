@@ -35,7 +35,16 @@ def build_model(config: ExperimentConfig, in_channels: int, num_classes: int) ->
     )
 
 
-def run(config: ExperimentConfig) -> Path:
+def _write_history(path: Path, history: list[dict[str, float | int]]) -> None:
+    if not history:
+        return
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(history[0]))
+        writer.writeheader()
+        writer.writerows(history)
+
+
+def run(config: ExperimentConfig, resume: bool = False) -> Path:
     seed_everything(config.seed)
     device = resolve_device(config.device)
     output_dir = Path(config.output_dir)
@@ -75,12 +84,37 @@ def run(config: ExperimentConfig) -> Path:
     criterion = nn.CrossEntropyLoss(label_smoothing=config.label_smoothing)
 
     best_path = output_dir / "best_model.pt"
+    last_path = output_dir / "last_checkpoint.pt"
     best_val_loss = float("inf")
     best_val_accuracy = float("-inf")
     stale_epochs = 0
     history: list[dict[str, float | int]] = []
+    elapsed_before = 0.0
+    start_epoch = 1
+    if resume and last_path.is_file():
+        checkpoint = torch.load(last_path, map_location=device, weights_only=False)
+        if checkpoint["config"] != config.to_dict():
+            raise ValueError("Resume configuration does not match the saved checkpoint")
+        model.load_state_dict(checkpoint["model_state"])
+        optimizer.load_state_dict(checkpoint["optimizer_state"])
+        if scheduler is not None and checkpoint["scheduler_state"] is not None:
+            scheduler.load_state_dict(checkpoint["scheduler_state"])
+        history = checkpoint["history"]
+        best_val_loss = float(checkpoint["best_val_loss"])
+        best_val_accuracy = float(checkpoint["best_val_accuracy"])
+        stale_epochs = int(checkpoint["stale_epochs"])
+        elapsed_before = float(checkpoint["elapsed_seconds"])
+        start_epoch = int(checkpoint["epoch"]) + 1
+        generator.set_state(checkpoint["generator_state"])
+        torch.set_rng_state(checkpoint["torch_rng_state"].cpu())
+        if device.type == "cuda" and checkpoint["cuda_rng_state_all"] is not None:
+            torch.cuda.set_rng_state_all(checkpoint["cuda_rng_state_all"])
+        print(f"Resuming from epoch {start_epoch} using {last_path}")
+    elif resume:
+        print(f"No recovery checkpoint found at {last_path}; starting from epoch 1")
+
     start = time.perf_counter()
-    for epoch in range(1, config.epochs + 1):
+    for epoch in range(start_epoch, config.epochs + 1):
         train_loss, train_accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
         val_result = predict(model, val_loader, criterion, device)
         val_metrics = classification_metrics(
@@ -130,14 +164,32 @@ def run(config: ExperimentConfig) -> Path:
             stale_epochs += 1
         if scheduler is not None:
             scheduler.step()
+        _write_history(output_dir / "history.csv", history)
+        torch.save(
+            {
+                "model_state": model.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "scheduler_state": scheduler.state_dict() if scheduler is not None else None,
+                "config": config.to_dict(),
+                "epoch": epoch,
+                "best_val_loss": best_val_loss,
+                "best_val_accuracy": best_val_accuracy,
+                "stale_epochs": stale_epochs,
+                "history": history,
+                "elapsed_seconds": elapsed_before + time.perf_counter() - start,
+                "generator_state": generator.get_state(),
+                "torch_rng_state": torch.get_rng_state(),
+                "cuda_rng_state_all": (
+                    torch.cuda.get_rng_state_all() if device.type == "cuda" else None
+                ),
+            },
+            last_path,
+        )
         if config.patience > 0 and stale_epochs >= config.patience:
             print(f"Early stopping after {epoch} epochs")
             break
 
-    with (output_dir / "history.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(history[0]))
-        writer.writeheader()
-        writer.writerows(history)
+    _write_history(output_dir / "history.csv", history)
 
     checkpoint = torch.load(best_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state"])
@@ -150,7 +202,7 @@ def run(config: ExperimentConfig) -> Path:
         "best_val_loss": checkpoint["best_val_loss"],
         "best_val_accuracy": checkpoint["best_val_accuracy"],
         "selection_metric": checkpoint["selection_metric"],
-        "elapsed_seconds": round(time.perf_counter() - start, 3),
+        "elapsed_seconds": round(elapsed_before + time.perf_counter() - start, 3),
         "device": str(device),
         "paper_reported_accuracy": 0.846,
         "test": {"loss": float(test_result["loss"]), **test_metrics},
@@ -167,6 +219,9 @@ def main() -> None:
     parser.add_argument("--device", default=None, help="Override config device, e.g. cpu or cuda")
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument(
+        "--resume", action="store_true", help="Resume from output-dir/last_checkpoint.pt"
+    )
     args = parser.parse_args()
     config = ExperimentConfig.from_yaml(args.config)
     if args.device is not None:
@@ -175,7 +230,7 @@ def main() -> None:
         config.epochs = args.epochs
     if args.output_dir is not None:
         config.output_dir = args.output_dir
-    run(config)
+    run(config, resume=args.resume)
 
 
 if __name__ == "__main__":
