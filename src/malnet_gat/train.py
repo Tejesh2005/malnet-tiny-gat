@@ -13,26 +13,31 @@ from .config import ExperimentConfig
 from .data import infer_class_names, load_splits
 from .engine import predict, train_epoch
 from .metrics import classification_metrics
-from .model import MalNetGAT
+from .model import MalNetGAT, MalNetMessagePassing
 from .utils import resolve_device, seed_everything, write_json
 
 
-def build_model(config: ExperimentConfig, in_channels: int, num_classes: int) -> MalNetGAT:
-    return MalNetGAT(
-        in_channels=in_channels,
-        num_classes=num_classes,
-        hidden_channels=config.hidden_channels,
-        num_layers=config.num_layers,
-        heads=config.heads,
-        concat_heads=config.concat_heads,
-        activation=config.activation,
-        layer_norm=config.layer_norm,
-        dropout=config.dropout,
-        attention_dropout=config.attention_dropout,
-        dropout_location=config.dropout_location,
-        pooling=config.pooling,
-        classifier_hidden=config.classifier_hidden,
-    )
+def build_model(config: ExperimentConfig, in_channels: int, num_classes: int) -> nn.Module:
+    common = {
+        "in_channels": in_channels,
+        "num_classes": num_classes,
+        "hidden_channels": config.hidden_channels,
+        "num_layers": config.num_layers,
+        "activation": config.activation,
+        "layer_norm": config.layer_norm,
+        "dropout": config.dropout,
+        "dropout_location": config.dropout_location,
+        "pooling": config.pooling,
+        "classifier_hidden": config.classifier_hidden,
+    }
+    if config.model_type == "gat":
+        return MalNetGAT(
+            **common,
+            heads=config.heads,
+            concat_heads=config.concat_heads,
+            attention_dropout=config.attention_dropout,
+        )
+    return MalNetMessagePassing(model_type=config.model_type, **common)
 
 
 def _write_history(path: Path, history: list[dict[str, float | int]]) -> None:
@@ -73,6 +78,7 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
     in_channels = train_set[0].num_node_features
     num_classes = len(class_names)
     model = build_model(config, in_channels, num_classes).to(device)
+    parameter_count = sum(parameter.numel() for parameter in model.parameters())
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )
@@ -205,6 +211,8 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
         "elapsed_seconds": round(elapsed_before + time.perf_counter() - start, 3),
         "device": str(device),
         "paper_reported_accuracy": 0.846,
+        "model_type": config.model_type,
+        "parameter_count": parameter_count,
         "test": {"loss": float(test_result["loss"]), **test_metrics},
     }
     write_json(output_dir / "test_metrics.json", summary)

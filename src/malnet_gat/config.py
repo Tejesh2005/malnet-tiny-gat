@@ -10,6 +10,7 @@ import yaml
 @dataclass
 class ExperimentConfig:
     seed: int = 42
+    model_type: str = "gat"
     data_root: str = "data/malnet_tiny_ldp"
     output_dir: str = "runs/paper_baseline"
     feature_profile: str = "ldp"
@@ -52,6 +53,8 @@ class ExperimentConfig:
         return config
 
     def validate(self) -> None:
+        if self.model_type not in {"gat", "gcn", "graphsage", "gin"}:
+            raise ValueError("model_type must be 'gat', 'gcn', 'graphsage', or 'gin'")
         if self.feature_profile not in {"ldp", "directed_ldp", "constant"}:
             raise ValueError("feature_profile must be 'ldp', 'directed_ldp', or 'constant'")
         if self.pooling not in {"mean", "max", "mean_max"}:

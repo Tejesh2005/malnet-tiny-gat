@@ -10,7 +10,7 @@ from malnet_gat.data import (
     make_pre_transform,
     stratified_split_indices,
 )
-from malnet_gat.model import MalNetGAT
+from malnet_gat.model import MalNetGAT, MalNetMessagePassing
 
 
 def test_structural_profile_is_finite() -> None:
@@ -174,3 +174,38 @@ def test_paper_dropout_is_only_after_graph_pooling() -> None:
     assert all(conv.dropout == 0.0 for conv in model.convs)
     assert model.node_dropout is False
     assert model.graph_dropout is True
+
+
+def test_comparison_models_return_matching_graph_shapes() -> None:
+    graphs = [
+        Data(
+            x=torch.ones((3, 5)),
+            edge_index=torch.tensor([[0, 1], [1, 2]]),
+            y=index,
+        )
+        for index in range(2)
+    ]
+    batch = Batch.from_data_list(graphs)
+    for model_type in ("gcn", "graphsage", "gin"):
+        model = MalNetMessagePassing(
+            model_type,
+            5,
+            5,
+            hidden_channels=8,
+            num_layers=3,
+        )
+        logits, embeddings = model(
+            batch.x, batch.edge_index, batch.batch, return_embedding=True
+        )
+        assert logits.shape == (2, 5)
+        assert embeddings.shape == (2, 8)
+
+
+def test_model_type_validation() -> None:
+    config = ExperimentConfig(model_type="unknown")
+    try:
+        config.validate()
+    except ValueError as error:
+        assert "model_type" in str(error)
+    else:
+        raise AssertionError("Expected invalid model_type to fail validation")

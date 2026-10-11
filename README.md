@@ -201,6 +201,24 @@ shuffle generator, RNG state, history, and elapsed time are restored.
 .\.venv\Scripts\malnet-train --config configs/paper_exact_graph_dropout.yaml --resume
 ```
 
+### Fair GNN architecture comparison
+
+GCN, GraphSAGE, GIN, and GAT can be compared with the same LDP data, stratified split,
+seed, three layers, 128 hidden channels, graph-level dropout, optimizer, and 50-epoch
+budget. Only the message-passing architecture changes. Each model has its own resumable
+output directory, and completed models are skipped when the command is restarted.
+
+```powershell
+.\.venv\Scripts\malnet-compare `
+  --config configs/paper_exact_graph_dropout.yaml `
+  --output-dir runs/model_comparison
+```
+
+If execution is interrupted, rerun with `--resume`. Final results are written to
+`comparison.csv`, `comparison.json`, and `comparison.png`. Parameter counts are
+reported because keeping the hidden width fixed does not make all architectures
+identical in capacity.
+
 ## Sources
 
 - Freitas et al., *MalNet: A Large-Scale Cybersecurity Graph Database*, NeurIPS 2021.
