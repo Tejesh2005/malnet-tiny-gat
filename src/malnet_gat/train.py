@@ -13,7 +13,7 @@ from .config import ExperimentConfig
 from .data import infer_class_names, load_splits
 from .engine import predict, train_epoch
 from .metrics import classification_metrics
-from .model import MalNetGAT, MalNetMessagePassing
+from .model import MalNetGAT, MalNetGGNN, MalNetMessagePassing, MalNetRGCN
 from .utils import resolve_device, seed_everything, write_json
 
 
@@ -37,6 +37,10 @@ def build_model(config: ExperimentConfig, in_channels: int, num_classes: int) ->
             concat_heads=config.concat_heads,
             attention_dropout=config.attention_dropout,
         )
+    if config.model_type == "ggnn":
+        return MalNetGGNN(**common)
+    if config.model_type == "rgcn":
+        return MalNetRGCN(**common)
     return MalNetMessagePassing(model_type=config.model_type, **common)
 
 
@@ -66,6 +70,7 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
     )
     class_names = infer_class_names(train_set)
     generator = torch.Generator().manual_seed(config.seed)
+    robust_generator = torch.Generator().manual_seed(config.seed + 10_000)
     common = {
         "batch_size": config.batch_size,
         "num_workers": config.num_workers,
@@ -99,7 +104,8 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
     start_epoch = 1
     if resume and last_path.is_file():
         checkpoint = torch.load(last_path, map_location=device, weights_only=False)
-        if checkpoint["config"] != config.to_dict():
+        saved_config = ExperimentConfig(**checkpoint["config"])
+        if saved_config.to_dict() != config.to_dict():
             raise ValueError("Resume configuration does not match the saved checkpoint")
         model.load_state_dict(checkpoint["model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
@@ -112,6 +118,8 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
         elapsed_before = float(checkpoint["elapsed_seconds"])
         start_epoch = int(checkpoint["epoch"]) + 1
         generator.set_state(checkpoint["generator_state"])
+        if "robust_generator_state" in checkpoint:
+            robust_generator.set_state(checkpoint["robust_generator_state"])
         torch.set_rng_state(checkpoint["torch_rng_state"].cpu())
         if device.type == "cuda" and checkpoint["cuda_rng_state_all"] is not None:
             torch.cuda.set_rng_state_all(checkpoint["cuda_rng_state_all"])
@@ -120,8 +128,30 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
         print(f"No recovery checkpoint found at {last_path}; starting from epoch 1")
 
     start = time.perf_counter()
+    batch_augmenter = None
+    if config.robust_training:
+        from .robustness import augment_batch
+
+        def batch_augmenter(batch):  # type: ignore[no-redef]
+            return augment_batch(
+                batch=batch,
+                probability=config.robust_augmentation_probability,
+                fraction=config.robust_perturbation_fraction,
+                perturbation_types=config.robust_perturbation_types,
+                feature_profile=config.feature_profile,
+                log_features=config.log_features,
+                generator=robust_generator,
+            )
+
     for epoch in range(start_epoch, config.epochs + 1):
-        train_loss, train_accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
+        train_loss, train_accuracy = train_epoch(
+            model,
+            train_loader,
+            optimizer,
+            criterion,
+            device,
+            batch_augmenter=batch_augmenter,
+        )
         val_result = predict(model, val_loader, criterion, device)
         val_metrics = classification_metrics(
             val_result["labels"], val_result["predictions"], class_names
@@ -184,6 +214,7 @@ def run(config: ExperimentConfig, resume: bool = False) -> Path:
                 "history": history,
                 "elapsed_seconds": elapsed_before + time.perf_counter() - start,
                 "generator_state": generator.get_state(),
+                "robust_generator_state": robust_generator.get_state(),
                 "torch_rng_state": torch.get_rng_state(),
                 "cuda_rng_state_all": (
                     torch.cuda.get_rng_state_all() if device.type == "cuda" else None

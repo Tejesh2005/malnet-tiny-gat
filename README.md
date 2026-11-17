@@ -203,14 +203,16 @@ shuffle generator, RNG state, history, and elapsed time are restored.
 
 ### Fair GNN architecture comparison
 
-GCN, GraphSAGE, GIN, and GAT can be compared with the same LDP data, stratified split,
-seed, three layers, 128 hidden channels, graph-level dropout, optimizer, and 50-epoch
-budget. Only the message-passing architecture changes. Each model has its own resumable
-output directory, and completed models are skipped when the command is restarted.
+GCN, GraphSAGE, GIN, GAT, GGNN, and a bidirectional R-GCN can be compared with the same
+LDP data, stratified split, seed, three message-passing steps/layers, 128 hidden
+channels, graph-level dropout, optimizer, and 50-epoch budget. GGNN adds gated recurrent
+propagation. R-GCN treats caller-to-callee and callee-to-caller propagation as two
+learned relations. Each model has its own resumable output directory, and completed
+models are skipped when the command is restarted.
 
 ```powershell
 .\.venv\Scripts\malnet-compare `
-  --config configs/paper_exact_graph_dropout.yaml `
+  --config configs/extended_comparison.yaml `
   --output-dir runs/model_comparison
 ```
 
@@ -218,6 +220,66 @@ If execution is interrupted, rerun with `--resume`. Final results are written to
 `comparison.csv`, `comparison.json`, and `comparison.png`. Parameter counts are
 reported because keeping the hidden width fixed does not make all architectures
 identical in capacity.
+
+### GNNDroid/FCGHunter-inspired MalNet-Tiny extensions
+
+These extensions deliberately use only information present in MalNet-Tiny. They do not
+claim access to function names, opcodes, sensitive API identities, native libraries, or
+executable APKs.
+
+The `enhanced` feature profile contains thirteen topology-only values per node: the
+eleven directed local-degree values, PageRank, and undirected local clustering. Use a
+separate processed root because PyG caches preprocessing results:
+
+```powershell
+.\.venv\Scripts\malnet-download --root data/malnet_tiny_enhanced `
+  --feature-profile enhanced --remove-isolated-nodes `
+  --split-strategy paper_stratified --split-seed 42
+```
+
+Train GIN with online graph augmentation. Each selected graph remains in the batch and
+is accompanied by a perturbed copy with the same label:
+
+```powershell
+.\.venv\Scripts\malnet-train --config configs/robust_gin_enhanced.yaml
+```
+
+Evaluate graph-level robustness at 1%, 5%, and 10% budgets using added leaf nodes,
+added edges, rewiring, and added call paths:
+
+```powershell
+.\.venv\Scripts\malnet-robustness `
+  --checkpoint runs/robust_gin_enhanced/best_model.pt `
+  --output-dir outputs/robust_gin_enhanced
+```
+
+The evaluator writes `robustness.csv`, `robustness.json`, and `robustness.png`, including
+clean/perturbed accuracy, macro-F1, prediction-change rate, attack success rate, and the
+average number of graph modifications. These are structural stress tests only; because
+MalNet-Tiny has no APK-to-node mapping, the changed graphs cannot be translated back to
+functionality-preserving Android applications.
+
+Run the complete architecture, feature, and robustness ablations with:
+
+```powershell
+.\.venv\Scripts\malnet-ablate `
+  --config configs/extended_comparison.yaml `
+  --output-dir runs/extended_ablations
+```
+
+For a quick Kaggle wiring check before starting the full experiment:
+
+```bash
+malnet-ablate \
+  --config configs/extended_comparison.yaml \
+  --output-dir /kaggle/working/extended_smoke \
+  --epochs 1 \
+  --max-robustness-samples 25
+```
+
+The full ablation is computationally expensive: it trains six architecture models,
+three feature variants, and standard/robust versions of the selected base model. It is
+resumable because completed result directories are reused.
 
 ## Sources
 

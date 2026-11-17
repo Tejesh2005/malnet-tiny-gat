@@ -1,0 +1,39 @@
+# GIN with thirteen topology-only features and online graph augmentation.
+seed: 42
+model_type: gin
+data_root: data/malnet_tiny_enhanced
+output_dir: runs/robust_gin_enhanced
+feature_profile: enhanced
+log_features: true
+remove_isolated_nodes: true
+split_strategy: paper_stratified
+split_seed: 42
+hidden_channels: 128
+num_layers: 3
+heads: 4
+concat_heads: false
+activation: relu
+layer_norm: false
+dropout: 0.50
+attention_dropout: 0.0
+dropout_location: graph
+pooling: mean
+classifier_hidden: false
+batch_size: 128
+epochs: 50
+learning_rate: 0.005
+weight_decay: 0.0
+label_smoothing: 0.0
+patience: 0
+lr_scheduler: none
+checkpoint_metric: val_accuracy
+num_workers: 0
+device: auto
+robust_training: true
+robust_augmentation_probability: 0.5
+robust_perturbation_fraction: 0.05
+robust_perturbation_types:
+  - add_nodes
+  - add_edges
+  - rewire
+  - add_paths

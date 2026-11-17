@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import torch
+from scipy.sparse import coo_matrix
 from sklearn.model_selection import train_test_split
 from torch.utils.data import ConcatDataset, Dataset, Subset
 from torch_geometric.data import Data
@@ -116,6 +117,76 @@ class DirectedStructuralProfile(BaseTransform):
         return data
 
 
+class EnhancedStructuralProfile(BaseTransform):
+    """Direction-aware local structure plus PageRank and clustering.
+
+    MalNet-Tiny does not expose function names, opcodes, or API identities. These
+    thirteen topology-only values therefore add global importance and local density
+    without claiming access to the semantic features used by GNNDroid or FCGHunter.
+    """
+
+    def __init__(self, log_features: bool = True, pagerank_steps: int = 20) -> None:
+        self.log_features = log_features
+        self.pagerank_steps = pagerank_steps
+        self.directed = DirectedStructuralProfile(log_features=False)
+
+    def _pagerank(self, edge_index: torch.Tensor, size: int) -> torch.Tensor:
+        if size == 0:
+            return torch.empty(0, dtype=torch.float32)
+        source, target = edge_index
+        out_degree = torch.bincount(source, minlength=size).float()
+        rank = torch.full((size,), 1.0 / size, dtype=torch.float32)
+        damping = 0.85
+        base = (1.0 - damping) / size
+        for _ in range(self.pagerank_steps):
+            contribution = rank / out_degree.clamp_min(1)
+            updated = torch.full_like(rank, base)
+            if source.numel():
+                updated.scatter_add_(0, target, damping * contribution[source])
+            dangling = rank[out_degree == 0].sum()
+            updated += damping * dangling / size
+            rank = updated
+        return rank
+
+    @staticmethod
+    def _clustering(edge_index: torch.Tensor, size: int) -> torch.Tensor:
+        if size == 0 or edge_index.numel() == 0:
+            return torch.zeros(size, dtype=torch.float32)
+        source = edge_index[0].cpu().numpy()
+        target = edge_index[1].cpu().numpy()
+        adjacency = coo_matrix(
+            (torch.ones(source.size).numpy(), (source, target)), shape=(size, size)
+        ).tocsr()
+        adjacency = adjacency.maximum(adjacency.transpose()).tocsr()
+        adjacency.setdiag(0)
+        adjacency.eliminate_zeros()
+        adjacency.data[:] = 1.0
+        degree = torch.from_numpy(
+            adjacency.getnnz(axis=1).astype("float32", copy=False)
+        )
+        closed_walks = torch.from_numpy(
+            (adjacency @ adjacency).multiply(adjacency).sum(axis=1).A1.astype(
+                "float32", copy=False
+            )
+        )
+        denominator = degree * (degree - 1)
+        return torch.where(
+            denominator > 0,
+            closed_walks / denominator.clamp_min(1),
+            torch.zeros_like(closed_walks),
+        )
+
+    def forward(self, data: Data) -> Data:
+        data = self.directed(data)
+        pagerank = self._pagerank(data.edge_index, data.num_nodes).unsqueeze(-1)
+        clustering = self._clustering(data.edge_index, data.num_nodes).unsqueeze(-1)
+        data.x = torch.cat([data.x, pagerank, clustering], dim=-1)
+        data.x = torch.nan_to_num(data.x.float(), nan=0.0, posinf=0.0, neginf=0.0)
+        if self.log_features:
+            data.x = torch.log1p(data.x)
+        return data
+
+
 def make_pre_transform(
     feature_profile: str,
     log_features: bool = True,
@@ -128,6 +199,8 @@ def make_pre_transform(
         transforms.append(StructuralProfile(log_features=log_features))
     elif feature_profile == "directed_ldp":
         transforms.append(DirectedStructuralProfile(log_features=log_features))
+    elif feature_profile == "enhanced":
+        transforms.append(EnhancedStructuralProfile(log_features=log_features))
     elif feature_profile == "constant":
         transforms.append(ConstantFeatures())
     else:
@@ -275,7 +348,9 @@ def download_main() -> None:
     parser = argparse.ArgumentParser(description="Download and preprocess MalNet-Tiny")
     parser.add_argument("--root", default="data/malnet_tiny_ldp")
     parser.add_argument(
-        "--feature-profile", choices=["ldp", "directed_ldp", "constant"], default="ldp"
+        "--feature-profile",
+        choices=["ldp", "directed_ldp", "enhanced", "constant"],
+        default="ldp",
     )
     parser.add_argument("--no-log-features", action="store_true")
     parser.add_argument("--remove-isolated-nodes", action="store_true")

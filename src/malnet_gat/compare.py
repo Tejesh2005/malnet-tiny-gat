@@ -3,8 +3,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
+
+# Keep Matplotlib's cache inside the writable project tree on managed machines.
+_MPL_CONFIG = Path(os.environ.get("MPLCONFIGDIR", Path.cwd() / ".cache" / "matplotlib"))
+_MPL_CONFIG.mkdir(parents=True, exist_ok=True)
+os.environ["MPLCONFIGDIR"] = str(_MPL_CONFIG)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +19,7 @@ from .config import ExperimentConfig
 from .train import run
 from .utils import write_json
 
-SUPPORTED_MODELS = ("gcn", "graphsage", "gin", "gat")
+SUPPORTED_MODELS = ("gcn", "graphsage", "gin", "gat", "ggnn", "rgcn")
 
 
 def compare(
@@ -105,7 +111,7 @@ def compare(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Compare GCN, GraphSAGE, GIN, and GAT under one protocol"
+        description="Compare GCN, GraphSAGE, GIN, GAT, GGNN, and R-GCN under one protocol"
     )
     parser.add_argument(
         "--config", default="configs/paper_exact_graph_dropout.yaml"

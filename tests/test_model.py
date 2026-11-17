@@ -1,16 +1,19 @@
 from pathlib import Path
 
+import pytest
 import torch
 from torch_geometric.data import Batch, Data
 
 from malnet_gat.config import ExperimentConfig
 from malnet_gat.data import (
     DirectedStructuralProfile,
+    EnhancedStructuralProfile,
     StructuralProfile,
     make_pre_transform,
     stratified_split_indices,
 )
-from malnet_gat.model import MalNetGAT, MalNetMessagePassing
+from malnet_gat.model import MalNetGAT, MalNetGGNN, MalNetMessagePassing, MalNetRGCN
+from malnet_gat.robustness import augment_batch, perturb_graph
 
 
 def test_structural_profile_is_finite() -> None:
@@ -43,6 +46,18 @@ def test_directed_profile_separates_in_and_out_degree() -> None:
     assert transformed.x[:, 0].tolist() == [0.0, 2.0, 1.0]
     assert transformed.x[:, 1].tolist() == [2.0, 0.0, 1.0]
     assert torch.isfinite(transformed.x).all()
+
+
+def test_enhanced_profile_adds_pagerank_and_clustering() -> None:
+    graph = Data(
+        edge_index=torch.tensor([[0, 1, 2], [1, 2, 0]], dtype=torch.long),
+        num_nodes=3,
+    )
+    transformed = EnhancedStructuralProfile(log_features=False)(graph)
+    assert transformed.x.shape == (3, 13)
+    assert torch.isfinite(transformed.x).all()
+    assert transformed.x[:, -2].sum().item() == pytest.approx(1.0, abs=1e-5)
+    assert transformed.x[:, -1].tolist() == pytest.approx([1.0, 1.0, 1.0])
 
 
 def test_model_returns_graph_logits_and_embeddings() -> None:
@@ -201,6 +216,72 @@ def test_comparison_models_return_matching_graph_shapes() -> None:
         assert embeddings.shape == (2, 8)
 
 
+def test_gated_and_relational_models_return_matching_graph_shapes() -> None:
+    graphs = [
+        Data(
+            x=torch.ones((3, 5)),
+            edge_index=torch.tensor([[0, 1], [1, 2]]),
+            y=index,
+        )
+        for index in range(2)
+    ]
+    batch = Batch.from_data_list(graphs)
+    for model in (
+        MalNetGGNN(5, 5, hidden_channels=8, num_layers=3),
+        MalNetRGCN(5, 5, hidden_channels=8, num_layers=3),
+    ):
+        logits, embeddings = model(
+            batch.x, batch.edge_index, batch.batch, return_embedding=True
+        )
+        assert logits.shape == (2, 5)
+        assert embeddings.shape == (2, 8)
+
+
+def test_graph_perturbations_recompute_features() -> None:
+    graph = Data(
+        x=torch.ones((3, 5)),
+        edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.long),
+        y=1,
+        num_nodes=3,
+    )
+    for index, perturbation in enumerate(("add_nodes", "add_edges", "rewire", "add_paths")):
+        changed, modifications = perturb_graph(
+            graph,
+            perturbation,
+            fraction=0.1,
+            feature_profile="ldp",
+            log_features=True,
+            generator=torch.Generator().manual_seed(index),
+        )
+        assert changed.x.shape == (changed.num_nodes, 5)
+        assert torch.isfinite(changed.x).all()
+        assert modifications > 0
+
+
+def test_robust_augmentation_keeps_originals_and_adds_copies() -> None:
+    graphs = [
+        Data(
+            x=torch.ones((3, 5)),
+            edge_index=torch.tensor([[0, 1], [1, 2]], dtype=torch.long),
+            y=index,
+            num_nodes=3,
+        )
+        for index in range(2)
+    ]
+    batch = Batch.from_data_list(graphs)
+    augmented = augment_batch(
+        batch,
+        probability=1.0,
+        fraction=0.1,
+        perturbation_types=["add_nodes"],
+        feature_profile="ldp",
+        log_features=True,
+        generator=torch.Generator().manual_seed(42),
+    )
+    assert augmented.num_graphs == 4
+    assert augmented.y.tolist() == [0, 1, 0, 1]
+
+
 def test_model_type_validation() -> None:
     config = ExperimentConfig(model_type="unknown")
     try:
@@ -209,3 +290,17 @@ def test_model_type_validation() -> None:
         assert "model_type" in str(error)
     else:
         raise AssertionError("Expected invalid model_type to fail validation")
+
+
+def test_extended_configuration_enables_new_models_and_robust_training() -> None:
+    config = ExperimentConfig.from_yaml(Path("configs/robust_gin_enhanced.yaml"))
+    assert config.feature_profile == "enhanced"
+    assert config.robust_training is True
+    assert set(config.robust_perturbation_types) == {
+        "add_nodes",
+        "add_edges",
+        "rewire",
+        "add_paths",
+    }
+    for model_type in ("ggnn", "rgcn"):
+        ExperimentConfig(model_type=model_type).validate()

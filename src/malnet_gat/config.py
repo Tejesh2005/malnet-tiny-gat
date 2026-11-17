@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,12 @@ class ExperimentConfig:
     checkpoint_metric: str = "val_loss"
     num_workers: int = 0
     device: str = "auto"
+    robust_training: bool = False
+    robust_augmentation_probability: float = 0.5
+    robust_perturbation_fraction: float = 0.05
+    robust_perturbation_types: list[str] = field(
+        default_factory=lambda: ["add_nodes", "add_edges", "rewire", "add_paths"]
+    )
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> ExperimentConfig:
@@ -53,10 +59,14 @@ class ExperimentConfig:
         return config
 
     def validate(self) -> None:
-        if self.model_type not in {"gat", "gcn", "graphsage", "gin"}:
-            raise ValueError("model_type must be 'gat', 'gcn', 'graphsage', or 'gin'")
-        if self.feature_profile not in {"ldp", "directed_ldp", "constant"}:
-            raise ValueError("feature_profile must be 'ldp', 'directed_ldp', or 'constant'")
+        if self.model_type not in {"gat", "gcn", "graphsage", "gin", "ggnn", "rgcn"}:
+            raise ValueError(
+                "model_type must be 'gat', 'gcn', 'graphsage', 'gin', 'ggnn', or 'rgcn'"
+            )
+        if self.feature_profile not in {"ldp", "directed_ldp", "enhanced", "constant"}:
+            raise ValueError(
+                "feature_profile must be 'ldp', 'directed_ldp', 'enhanced', or 'constant'"
+            )
         if self.pooling not in {"mean", "max", "mean_max"}:
             raise ValueError("pooling must be 'mean', 'max', or 'mean_max'")
         if self.split_strategy not in {"official", "paper_stratified"}:
@@ -77,6 +87,16 @@ class ExperimentConfig:
             raise ValueError("dropout_location must be 'node', 'graph', or 'both'")
         if self.patience < 0:
             raise ValueError("patience must be non-negative")
+        if not 0 <= self.robust_augmentation_probability <= 1:
+            raise ValueError("robust_augmentation_probability must be in [0, 1]")
+        if not 0 < self.robust_perturbation_fraction <= 1:
+            raise ValueError("robust_perturbation_fraction must be in (0, 1]")
+        supported_perturbations = {"add_nodes", "add_edges", "rewire", "add_paths"}
+        unknown = sorted(set(self.robust_perturbation_types) - supported_perturbations)
+        if unknown:
+            raise ValueError(f"Unsupported robust perturbation types: {', '.join(unknown)}")
+        if not self.robust_perturbation_types:
+            raise ValueError("robust_perturbation_types must not be empty")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

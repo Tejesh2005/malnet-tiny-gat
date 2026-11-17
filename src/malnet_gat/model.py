@@ -5,8 +5,10 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 from torch_geometric.nn import (
     GATConv,
+    GatedGraphConv,
     GCNConv,
     GINConv,
+    RGCNConv,
     SAGEConv,
     global_max_pool,
     global_mean_pool,
@@ -203,6 +205,154 @@ class MalNetMessagePassing(nn.Module):
     ) -> Tensor | tuple[Tensor, Tensor]:
         node_embeddings = self.encode_nodes(x, edge_index)
         graph_embedding = self.pool(node_embeddings, batch)
+        if self.graph_dropout:
+            graph_embedding = F.dropout(
+                graph_embedding, p=self.dropout, training=self.training
+            )
+        logits = self.classifier(graph_embedding)
+        if return_embedding:
+            return logits, graph_embedding
+        return logits
+
+
+class MalNetGGNN(nn.Module):
+    """Gated recurrent message passing over a directed function-call graph."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        num_classes: int,
+        hidden_channels: int = 128,
+        num_layers: int = 3,
+        activation: str = "relu",
+        layer_norm: bool = False,
+        dropout: float = 0.5,
+        dropout_location: str = "graph",
+        pooling: str = "mean",
+        classifier_hidden: bool = False,
+    ) -> None:
+        super().__init__()
+        self.dropout = dropout
+        self.node_dropout = dropout_location in {"node", "both"}
+        self.graph_dropout = dropout_location in {"graph", "both"}
+        self.pooling = pooling
+        self.activation = activation
+        self.input_projection = nn.Linear(in_channels, hidden_channels)
+        self.conv = GatedGraphConv(out_channels=hidden_channels, num_layers=num_layers)
+        self.norm = nn.LayerNorm(hidden_channels) if layer_norm else nn.Identity()
+        pooled_channels = hidden_channels * (2 if pooling == "mean_max" else 1)
+        if classifier_hidden:
+            nonlinearity: nn.Module = nn.ELU() if activation == "elu" else nn.ReLU()
+            self.classifier = nn.Sequential(
+                nn.Linear(pooled_channels, hidden_channels),
+                nonlinearity,
+                nn.Dropout(dropout),
+                nn.Linear(hidden_channels, num_classes),
+            )
+        else:
+            self.classifier = nn.Linear(pooled_channels, num_classes)
+
+    def _activate(self, x: Tensor) -> Tensor:
+        return F.elu(x) if self.activation == "elu" else F.relu(x)
+
+    def pool(self, x: Tensor, batch: Tensor) -> Tensor:
+        if self.pooling == "mean":
+            return global_mean_pool(x, batch)
+        if self.pooling == "max":
+            return global_max_pool(x, batch)
+        if self.pooling == "mean_max":
+            return torch.cat([global_mean_pool(x, batch), global_max_pool(x, batch)], dim=-1)
+        raise ValueError(f"Unsupported pooling: {self.pooling}")
+
+    def forward(
+        self, x: Tensor, edge_index: Tensor, batch: Tensor, return_embedding: bool = False
+    ) -> Tensor | tuple[Tensor, Tensor]:
+        x = self._activate(self.input_projection(x))
+        x = self._activate(self.norm(self.conv(x, edge_index)))
+        if self.node_dropout:
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        graph_embedding = self.pool(x, batch)
+        if self.graph_dropout:
+            graph_embedding = F.dropout(
+                graph_embedding, p=self.dropout, training=self.training
+            )
+        logits = self.classifier(graph_embedding)
+        if return_embedding:
+            return logits, graph_embedding
+        return logits
+
+
+class MalNetRGCN(nn.Module):
+    """Bidirectional relational GCN with caller-to-callee and reverse relations."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        num_classes: int,
+        hidden_channels: int = 128,
+        num_layers: int = 3,
+        activation: str = "relu",
+        layer_norm: bool = False,
+        dropout: float = 0.5,
+        dropout_location: str = "graph",
+        pooling: str = "mean",
+        classifier_hidden: bool = False,
+    ) -> None:
+        super().__init__()
+        self.dropout = dropout
+        self.node_dropout = dropout_location in {"node", "both"}
+        self.graph_dropout = dropout_location in {"graph", "both"}
+        self.pooling = pooling
+        self.activation = activation
+        self.convs = nn.ModuleList()
+        self.norms = nn.ModuleList()
+        current = in_channels
+        for _ in range(num_layers):
+            self.convs.append(RGCNConv(current, hidden_channels, num_relations=2))
+            self.norms.append(
+                nn.LayerNorm(hidden_channels) if layer_norm else nn.Identity()
+            )
+            current = hidden_channels
+        pooled_channels = current * (2 if pooling == "mean_max" else 1)
+        if classifier_hidden:
+            nonlinearity: nn.Module = nn.ELU() if activation == "elu" else nn.ReLU()
+            self.classifier = nn.Sequential(
+                nn.Linear(pooled_channels, hidden_channels),
+                nonlinearity,
+                nn.Dropout(dropout),
+                nn.Linear(hidden_channels, num_classes),
+            )
+        else:
+            self.classifier = nn.Linear(pooled_channels, num_classes)
+
+    def _activate(self, x: Tensor) -> Tensor:
+        return F.elu(x) if self.activation == "elu" else F.relu(x)
+
+    def pool(self, x: Tensor, batch: Tensor) -> Tensor:
+        if self.pooling == "mean":
+            return global_mean_pool(x, batch)
+        if self.pooling == "max":
+            return global_max_pool(x, batch)
+        if self.pooling == "mean_max":
+            return torch.cat([global_mean_pool(x, batch), global_max_pool(x, batch)], dim=-1)
+        raise ValueError(f"Unsupported pooling: {self.pooling}")
+
+    def forward(
+        self, x: Tensor, edge_index: Tensor, batch: Tensor, return_embedding: bool = False
+    ) -> Tensor | tuple[Tensor, Tensor]:
+        reverse_edges = edge_index.flip(0)
+        relational_edges = torch.cat([edge_index, reverse_edges], dim=1)
+        edge_type = torch.cat(
+            [
+                torch.zeros(edge_index.size(1), dtype=torch.long, device=edge_index.device),
+                torch.ones(edge_index.size(1), dtype=torch.long, device=edge_index.device),
+            ]
+        )
+        for conv, norm in zip(self.convs, self.norms, strict=True):
+            x = self._activate(norm(conv(x, relational_edges, edge_type)))
+            if self.node_dropout:
+                x = F.dropout(x, p=self.dropout, training=self.training)
+        graph_embedding = self.pool(x, batch)
         if self.graph_dropout:
             graph_embedding = F.dropout(
                 graph_embedding, p=self.dropout, training=self.training

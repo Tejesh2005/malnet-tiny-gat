@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 
 import numpy as np
@@ -15,6 +15,7 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
     device: torch.device,
+    batch_augmenter: Callable[[Batch], Batch] | None = None,
 ) -> tuple[float, float]:
     model.train()
     loss_sum = 0.0
@@ -23,6 +24,8 @@ def train_epoch(
     use_amp = device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     for batch in loader:
+        if batch_augmenter is not None:
+            batch = batch_augmenter(batch)
         batch = batch.to(device)
         optimizer.zero_grad(set_to_none=True)
         amp_context = torch.amp.autocast("cuda") if use_amp else nullcontext()

@@ -13,6 +13,7 @@ dependencies = [
   "torch-geometric>=2.6",
   "numpy>=2.0,<3",
   "scikit-learn>=1.5",
+  "scipy>=1.14",
   "pandas>=2.2",
   "matplotlib>=3.9",
   "seaborn>=0.13",
@@ -30,6 +31,8 @@ malnet-train = "malnet_gat.train:main"
 malnet-evaluate = "malnet_gat.evaluate:main"
 malnet-multiseed = "malnet_gat.multiseed:main"
 malnet-compare = "malnet_gat.compare:main"
+malnet-robustness = "malnet_gat.robustness:main"
+malnet-ablate = "malnet_gat.ablate:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
